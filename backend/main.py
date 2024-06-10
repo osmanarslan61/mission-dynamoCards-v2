@@ -21,20 +21,24 @@ app.add_middleware(
     allow_headers = ["*"],
 )
 
+genai_processor = GeminiProcessor(
+        model_name="gemini-pro",
+        project = "dynamoproject-424320"
+)
 
 @app.post("/analyze-video")
 def analyze_video(request: VideoAnalysisRequest):
     #Doing the analysis
 
-    processor = YoutubeProcessor()
+    processor = YoutubeProcessor(genai_processor=genai_processor)
     result = processor.retrieve_youtube_documents(str(request.youtube_link))
 
-    genai_processor = GeminiProcessor(
-        model_name="gemini-pro",
-        project = "dynamoproject-424320"
-    )
-    summary =genai_processor.generate_document_summary(result, verbose=True)
+    #summary =genai_processor.generate_document_summary(result, verbose=True)
+
+    #Find key concepts
+    key_concepts = processor.find_key_concepts(result, group_size=2)
+    
     return {
-        "summary": summary
+        "key_concepts": key_concepts
     }
 
