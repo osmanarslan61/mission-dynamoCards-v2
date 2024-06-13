@@ -4,6 +4,7 @@ from langchain_google_vertexai import VertexAI
 from langchain.chains.summarize import load_summarize_chain
 from vertexai.generative_models import GenerativeModel
 from langchain.prompts import PromptTemplate
+import json
 import logging
 from tqdm import tqdm
 
@@ -64,13 +65,26 @@ class YoutubeProcessor:
 
         return result
 
-    def find_key_concepts(self, documents:list, group_size: int=10, verbose = True):
+    def find_key_concepts(self, documents:list, sample_size: int=0, verbose = True):
         #iterate through all documents of group size N and find key concepts
-        if group_size > len(documents):
+        if sample_size > len(documents):
             raise ValueError("Group size is larger than the number of documents")
         
+        #Optimize sample size given no input
+        if sample_size == 0:
+            sample_size = len(documents) // 5
+            if verbose:
+                logging.info("No sample size specified. Setting number of documents per sample as 5. Sample Size: {sample_size}")
+        
         #Find number of documents in each group
-        num_docs_per_group = len(documents) // group_size + (len(documents) % group_size >0)
+        num_docs_per_group = len(documents) // sample_size + (len(documents) % sample_size >0)
+
+        if num_docs_per_group >= 10:
+            raise ValueError("""Each group has more than 10 documents and output quality will be degraded significantly.
+                             Increase the sample_size parameter to reduce the number of documents per group""")
+        elif num_docs_per_group > 5:
+            logging.warn("""Each group has more than 5 documents and output quality is likely to be degraded.
+                         Consider increasing the sample size""")
 
         #Split the document in chunks of size num_docs_per_group
         groups = [documents[i:i+num_docs_per_group] for i in range(0, len(documents), num_docs_per_group)]
@@ -92,8 +106,9 @@ class YoutubeProcessor:
                 Find and define key concepts or terms found in the text:
                 {text}
 
-                Respond in the following format as a string separating each concept with a comma:
-                "concept": "definition"
+                Respond in the following format as a JSON object without any backticks separating each concept with a comma:
+                {{"concept": "definition", "concept": "definition", ...}}
+                Do not include any text other than the JSON object
                 """,
                 input_variables=["text"]
             )
@@ -103,6 +118,9 @@ class YoutubeProcessor:
 
             #Run chain
             output_concept = chain.invoke({"text":group_content})
+
+            #Make sure the concept is in the right format
+            output_concept = output_concept.replace("```json", "").replace("```", "").strip()
             batch_concepts.append(output_concept)
 
             #Post processing Observation
@@ -123,8 +141,11 @@ class YoutubeProcessor:
                 batch_cost += total_input_cost + total_output_cost
                 logging.info(f"Total group cost: {total_input_cost + total_output_cost}\n")
 
+        #Convert each JSON string in batch_concepts to Python dict
+        processed_concepts = [json.loads(concept) for concept in batch_concepts]
+        
         logging.info(f"Total Analysis Cost: ${batch_cost}")
-        return batch_concepts
+        return processed_concepts
 
 
 
