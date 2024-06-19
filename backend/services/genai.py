@@ -108,7 +108,7 @@ class YoutubeProcessor:
 
                 Respond in the following format as a JSON object without any backticks separating each concept with a comma:
                 {{"concept": "definition", "concept": "definition", ...}}
-                Do not include any text other than the JSON object
+                Do not include any text other than the JSON object. Your response should be a parsable json object
                 """,
                 input_variables=["text"]
             )
