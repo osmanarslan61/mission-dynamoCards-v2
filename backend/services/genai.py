@@ -116,11 +116,23 @@ class YoutubeProcessor:
             #Create chain
             chain = prompt | self.GeminiProcessor.model
 
-            #Run chain
-            output_concept = chain.invoke({"text":group_content})
+            json_format = False
+            while json_format == False:
+                #Run chain
+                output_concept = chain.invoke({"text":group_content})
 
-            #Make sure the concept is in the right format
-            output_concept = output_concept.replace("```json", "").replace("```", "").strip()
+                #Make sure the concept is in the right format
+                output_concept = output_concept.replace("```json", "").replace("```", "").strip()
+                
+                try:
+                    output_json = json.loads(output_concept)
+                    # Convert the JSON String to a dictionary
+                except json.JSONDecodeError:
+                    logging.info("Failed to decode question JSON.")
+                    continue
+                json_format = True 
+                logging.info("Successfully parsed JSON.")
+
             batch_concepts.append(output_concept)
 
             #Post processing Observation
